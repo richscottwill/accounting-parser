@@ -1,34 +1,58 @@
 # tests/fixtures/vendor
 
-Vendor-published or public-domain reference documents.
+Vendor-published, public-domain, or openly-licensed reference documents used by `accounting-parser` tests.
 
 ## What's here
 
-### `irs-gov/` — Public domain ✓
+### `irs-gov/` — Public domain (US Government, 17 USC §105)
 
-Official IRS form PDFs downloaded from irs.gov. Works of the US Government are public domain under [17 U.S.C. § 105](https://www.law.cornell.edu/uscode/text/17/105) — free to reproduce and redistribute without restriction. See `irs-gov/SOURCE.md` for the full manifest and refresh protocol.
+8 official IRS form PDFs: W-2, W-9, 1099-NEC/MISC/DIV/INT, Schedule K-1 for Forms 1065 and 1120-S. See `irs-gov/SOURCE.md`.
+
+### `ofxparse/` — MIT License
+
+21 real-world OFX test fixtures from `jseutter/ofxparse`. Bank statements, credit cards, savings, 401(k)s, investment accounts, error paths, vendor-specific quirks. See `ofxparse/SOURCE.md`.
+
+### `pdfplumber-samples/` — MIT + public-domain government documents
+
+7 real-world public-domain PDFs from `jsvine/pdfplumber` tests. California WARN Report, FBI NICS background checks, Senate expenditures, LA precinct bulletin, SCOTUS transcript, Federal Register document, password-protected sample. See `pdfplumber-samples/SOURCE.md`.
+
+### `sec-edgar/` — Public domain (SEC filings)
+
+Real SEC EDGAR inline XBRL filings. Currently: Tesla Form 10-K for FY 2025 (~8 MB, 8 files). See `sec-edgar/SOURCE.md`.
 
 ## What's deliberately absent
 
-Task 2 of the implementation plan originally called for loading "vendor-published sample files where public" from the tax-software vendors. After research:
+Tax-software vendor templates from:
 
-- **CCH Axcess Engagement** — Wolters Kluwer publishes a free downloadable "Trial Balance Worksheet" on bizfilings.com, but it is a generic BizFilings tool, not the CCH Axcess Engagement import template. Sample import templates ship only inside licensed Engagement installs and are subject to Wolters Kluwer's license terms.
-- **Thomson Reuters AdvanceFlow / UltraTax CS** — No publicly-redistributable sample files. Help documentation only.
-- **Intuit QuickBooks** — Sample companies are accessible via the live web sandbox at `qbo.intuit.com/redir/testdrive`. No downloadable company file.
-- **Intuit Lacerte** — Sample templates ship only inside licensed installs.
+- **CCH Axcess Engagement** (Wolters Kluwer)
+- **Thomson Reuters AdvanceFlow / UltraTax CS**
+- **Intuit QuickBooks** (sample companies are live web sandbox only)
+- **Intuit Lacerte**
 
-Committing vendor-licensed samples to a public GitHub repo would violate their license terms. Our factories in `../factories/` produce structurally-equivalent synthetic approximations following the vendors' publicly-documented import-template specs (column order, header names, expected data types).
+Sample templates from these vendors ship only inside licensed installs and are not freely redistributable. Our factories in `../factories/` produce synthetic approximations following each vendor's publicly-documented import-template specs. The real acceptance gate for Tasks 18-20 exporters is manual round-trip through a licensed vendor sandbox.
 
-## The real acceptance gate for vendor exports
+## Corpus statistics
 
-Our synthetic fixtures test *our* side of the export. Before promoting a Task 18-20 exporter (CCH Engagement, UltraTax + AdvanceFlow, Lacerte) to production, the generated export file must be **manually round-tripped through a licensed sandbox** of the target vendor system. That's the only way to confirm we're emitting the shape the vendor actually accepts.
+| Directory              | Files  | Total size  | Source reliability        |
+| ---------------------- | ------ | ----------- | ------------------------- |
+| `irs-gov/`             | 8      | ~3.6 MB     | Official IRS              |
+| `ofxparse/`            | 21     | ~55 KB      | MIT OSS, canonical tests  |
+| `pdfplumber-samples/`  | 7      | ~1.5 MB     | MIT OSS + US/CA gov       |
+| `sec-edgar/tesla-10k-2025/` | 8  | ~8 MB       | Official SEC filing       |
+| **Totals**             | **44** | **~13 MB**  |                           |
 
 ## Adding more vendor content
 
-If a vendor publishes a freely-redistributable sample file with an explicit license (e.g., a public GitHub repo under a permissive license, or a Creative Commons grant), add it here:
+If a vendor publishes freely-redistributable sample files with an explicit license:
 
-1. Create a subdirectory named after the vendor, e.g. `vendor/wolters-kluwer/`.
-2. Add a `SOURCE.md` with the download URL, date pulled, license text or link, and any attribution required.
-3. Commit the sample file.
+1. Create a subdirectory named after the vendor, e.g. `vendor/<vendor-slug>/`.
+2. Add `SOURCE.md` with: download URL, download date, license text or link, file manifest with sizes and purposes, refresh protocol.
+3. Commit the sample files.
 
 Do not commit vendor-copyrighted content without an explicit written license permitting redistribution.
+
+## Why vendor samples matter
+
+The synthetic factories in `../factories/` produce idealised documents — clean grammar, consistent formatting, predictable values. Real-world documents have ugly edge cases: page rotations, column-boundary quirks, embedded fonts that break text extraction, encrypted content, multi-byte character encodings, vendor-specific dialect variations.
+
+Every downstream parser (Tasks 8-11) that passes synthetic-factory tests but fails against the files in this directory has a real-world defect. These files are the regression benchmark.

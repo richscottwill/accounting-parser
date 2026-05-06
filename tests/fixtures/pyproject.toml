@@ -20,6 +20,7 @@ packages = [{ include = "factories" }]
 pytest = "^8.3"
 ruff = "^0.7"
 black = "^24.10"
+ofxparse = "^0.21"
 
 [build-system]
 requires = ["poetry-core>=2.0"]

@@ -1,0 +1,19 @@
+# Keep test fixtures byte-identical across platforms. These files often
+# carry grammar-sensitive line endings (OFX SGML, XBRL XML, IIF tab-separated)
+# and are validated by byte content in tests.
+tests/fixtures/vendor/**/*.ofx    -text
+tests/fixtures/vendor/**/*.qfx    -text
+tests/fixtures/vendor/**/*.qif    -text
+tests/fixtures/vendor/**/*.iif    -text
+tests/fixtures/vendor/**/*.xml    -text
+tests/fixtures/vendor/**/*.xsd    -text
+tests/fixtures/vendor/**/*.xbrl   -text
+
+# Binary formats — never touch
+*.pdf    binary
+*.xlsx   binary
+*.xlsb   binary
+*.xls    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
