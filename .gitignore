@@ -79,3 +79,7 @@ server.log
 
 # Fixture outputs (generated)
 tests/fixtures/generated/
+
+# Fixture generation output (regenerated on demand)
+tests/fixtures/generated/
+tests/fixtures/**/.pytest_cache/

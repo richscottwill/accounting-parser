@@ -1,0 +1,1 @@
+"""Factory-level smoke tests."""
