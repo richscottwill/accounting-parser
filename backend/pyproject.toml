@@ -24,6 +24,7 @@ dependencies = [
     "fido2 (>=1.1,<2.0)",
     "python-multipart (>=0.0.12,<1.0)",
     "structlog (>=24.4,<25.0)",
+    "ofxparse (>=0.21,<0.22)",
 ]
 
 [tool.poetry]
@@ -76,6 +77,8 @@ addopts = "-ra --strict-markers --cov=accounting_parser --cov-report=term-missin
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:passlib",
+    "ignore::DeprecationWarning:bs4",
+    "ignore::DeprecationWarning:ofxparse",
 ]
 
 [tool.coverage.run]
