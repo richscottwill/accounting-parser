@@ -40,6 +40,7 @@ black = "^24.10"
 isort = "^5.13"
 pre-commit = "^4.0"
 types-boto3 = "^1.0"
+pgserver = "^0.1.4"
 
 [tool.black]
 line-length = 100
@@ -72,7 +73,10 @@ disallow_incomplete_defs = true
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-ra --strict-markers --cov=accounting_parser --cov-report=term-missing"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:passlib",
+]
 
 [tool.coverage.run]
 source = ["src/accounting_parser"]
