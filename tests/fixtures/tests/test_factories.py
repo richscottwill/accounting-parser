@@ -42,30 +42,36 @@ def _assert_file(p: Path, *, ext: str, min_bytes: int = 200) -> None:
     assert p.stat().st_size >= min_bytes, f"{p} is suspiciously small ({p.stat().st_size} bytes)"
 
 
-@pytest.mark.parametrize("factory,name,ext", [
-    (qbo_tb_pdf_factory, "qbo.pdf", ".pdf"),
-    (qbd_gl_pdf_factory, "qbd.pdf", ".pdf"),
-    (sage_intacct_tb_pdf_factory, "intacct.pdf", ".pdf"),
-    (xero_tb_xlsx_factory, "xero.xlsx", ".xlsx"),
-    (netsuite_tb_xlsx_factory, "ns.xlsx", ".xlsx"),
-    (cch_engagement_import_xlsx_factory, "cch.xlsx", ".xlsx"),
-    (prior_year_1120s_factory, "py1120s.pdf", ".pdf"),
-    (fixed_asset_schedule_factory, "fa.xlsx", ".xlsx"),
-    (ofx_factory, "s.ofx", ".ofx"),
-    (qfx_factory, "s.qfx", ".qfx"),
-    (qif_factory, "s.qif", ".qif"),
-    (iif_factory, "s.iif", ".iif"),
-    (xbrl_factory, "s.xbrl", ".xbrl"),
-    (corrupted_pdf_factory, "c.pdf", ".pdf"),
-    (corrupted_xlsx_factory, "c.xlsx", ".xlsx"),
-    (password_protected_pdf_factory, "pp.pdf", ".pdf"),
-    (password_protected_xlsx_factory, "pp.xlsx", ".xlsx"),
-    (image_only_scan_pdf_factory, "scan.pdf", ".pdf"),
+# (factory, output_name, expected_extension, min_bytes).
+# min_bytes is a per-factory floor chosen so that legitimate output passes
+# but truncated/zero-byte output fails. QIF transaction records are small
+# by nature (~50 bytes each); the compact 4-transaction sample naturally
+# lands under the 200-byte default, so its floor is set to 150. Corrupted
+# factories deliberately produce tiny invalid blobs and use 30.
+@pytest.mark.parametrize("factory,name,ext,min_bytes", [
+    (qbo_tb_pdf_factory, "qbo.pdf", ".pdf", 200),
+    (qbd_gl_pdf_factory, "qbd.pdf", ".pdf", 200),
+    (sage_intacct_tb_pdf_factory, "intacct.pdf", ".pdf", 200),
+    (xero_tb_xlsx_factory, "xero.xlsx", ".xlsx", 200),
+    (netsuite_tb_xlsx_factory, "ns.xlsx", ".xlsx", 200),
+    (cch_engagement_import_xlsx_factory, "cch.xlsx", ".xlsx", 200),
+    (prior_year_1120s_factory, "py1120s.pdf", ".pdf", 200),
+    (fixed_asset_schedule_factory, "fa.xlsx", ".xlsx", 200),
+    (ofx_factory, "s.ofx", ".ofx", 200),
+    (qfx_factory, "s.qfx", ".qfx", 200),
+    (qif_factory, "s.qif", ".qif", 150),
+    (iif_factory, "s.iif", ".iif", 200),
+    (xbrl_factory, "s.xbrl", ".xbrl", 200),
+    (corrupted_pdf_factory, "c.pdf", ".pdf", 30),
+    (corrupted_xlsx_factory, "c.xlsx", ".xlsx", 30),
+    (password_protected_pdf_factory, "pp.pdf", ".pdf", 200),
+    (password_protected_xlsx_factory, "pp.xlsx", ".xlsx", 200),
+    (image_only_scan_pdf_factory, "scan.pdf", ".pdf", 200),
 ])
-def test_single_arg_factory_produces_valid_file(tmp_path: Path, factory, name: str, ext: str) -> None:
+def test_single_arg_factory_produces_valid_file(
+    tmp_path: Path, factory, name: str, ext: str, min_bytes: int
+) -> None:
     out = factory(tmp_path / name)
-    # Corrupted factories are deliberately tiny; allow smaller min size
-    min_bytes = 30 if "corrupt" in factory.__name__ else 200
     _assert_file(out, ext=ext, min_bytes=min_bytes)
 
 
