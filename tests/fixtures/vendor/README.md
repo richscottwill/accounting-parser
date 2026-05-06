@@ -1,37 +1,34 @@
 # tests/fixtures/vendor
 
-**This directory is intentionally empty of vendor-published content.**
+Vendor-published or public-domain reference documents.
 
-## Why
+## What's here
 
-Task 2 of the implementation plan calls for loading "vendor-published sample files where public" — specifically Wolters Kluwer CCH Engagement sample TB and Thomson Reuters AdvanceFlow sample spreadsheet.
+### `irs-gov/` — Public domain ✓
 
-After reviewing:
+Official IRS form PDFs downloaded from irs.gov. Works of the US Government are public domain under [17 U.S.C. § 105](https://www.law.cornell.edu/uscode/text/17/105) — free to reproduce and redistribute without restriction. See `irs-gov/SOURCE.md` for the full manifest and refresh protocol.
 
-- **CCH Axcess Engagement** — sample templates ship inside licensed installs. Wolters Kluwer's license terms restrict redistribution. No publicly-redistributable sample TB has been located.
-- **Thomson Reuters AdvanceFlow** — same pattern. Sample spreadsheets require a licensed installation and are not public-domain.
-- **UltraTax CS** — same.
-- **Lacerte Trial Balance Utility** — same.
+## What's deliberately absent
 
-Bundling these in a public GitHub repo would violate the vendors' license terms.
+Task 2 of the implementation plan originally called for loading "vendor-published sample files where public" from the tax-software vendors. After research:
 
-## What we do instead
+- **CCH Axcess Engagement** — Wolters Kluwer publishes a free downloadable "Trial Balance Worksheet" on bizfilings.com, but it is a generic BizFilings tool, not the CCH Axcess Engagement import template. Sample import templates ship only inside licensed Engagement installs and are subject to Wolters Kluwer's license terms.
+- **Thomson Reuters AdvanceFlow / UltraTax CS** — No publicly-redistributable sample files. Help documentation only.
+- **Intuit QuickBooks** — Sample companies are accessible via the live web sandbox at `qbo.intuit.com/redir/testdrive`. No downloadable company file.
+- **Intuit Lacerte** — Sample templates ship only inside licensed installs.
 
-Our factories in `../factories/` produce **structurally equivalent synthetic approximations**:
+Committing vendor-licensed samples to a public GitHub repo would violate their license terms. Our factories in `../factories/` produce structurally-equivalent synthetic approximations following the vendors' publicly-documented import-template specs (column order, header names, expected data types).
 
-- `cch_engagement_import_xlsx_factory` emits the documented 13-column layout CCH Engagement accepts (Account Number, Account Name, Account Type, Prior Year, Unadjusted, AJE, Adjusted, RJE, Final, TJE, Tax Basis, FS Grouping, Tax Grouping). Column order and header names match CCH's publicly-documented import template. Cell formatting and styling approximate the real template but are not copies.
-- AdvanceFlow, UltraTax, Lacerte equivalents are generated from their respective publicly-documented import-template specs (to be added in Tasks 18-20 when those exporters ship).
+## The real acceptance gate for vendor exports
 
-## Acceptance path
+Our synthetic fixtures test *our* side of the export. Before promoting a Task 18-20 exporter (CCH Engagement, UltraTax + AdvanceFlow, Lacerte) to production, the generated export file must be **manually round-tripped through a licensed sandbox** of the target vendor system. That's the only way to confirm we're emitting the shape the vendor actually accepts.
 
-Before promoting a Task 18/19 exporter to production, the generated export file must be **manually round-tripped through a licensed sandbox** of the target vendor system. That's the real acceptance gate. Synthetic fixtures test our side; a vendor round-trip tests theirs.
+## Adding more vendor content
 
-## If vendor-published public samples surface
+If a vendor publishes a freely-redistributable sample file with an explicit license (e.g., a public GitHub repo under a permissive license, or a Creative Commons grant), add it here:
 
-If Wolters Kluwer or Thomson Reuters ever publish freely-redistributable sample files with explicit permission (e.g., via a public GitHub repo under a permissive license), add them here with:
+1. Create a subdirectory named after the vendor, e.g. `vendor/wolters-kluwer/`.
+2. Add a `SOURCE.md` with the download URL, date pulled, license text or link, and any attribution required.
+3. Commit the sample file.
 
-1. A subdirectory named after the vendor, e.g. `vendor/wolters-kluwer/`
-2. A `SOURCE.md` file in that subdirectory noting the download URL, the date pulled, the license, and any attribution required
-3. Commit the sample itself
-
-Until then, this directory stays empty.
+Do not commit vendor-copyrighted content without an explicit written license permitting redistribution.

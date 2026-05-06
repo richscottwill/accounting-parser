@@ -18,10 +18,11 @@ This writes ~26 fixtures into `generated/`. That directory is gitignored — reg
 
 | Path                    | Contents                                         |
 | ----------------------- | ------------------------------------------------ |
-| `factories/`            | Python factories that emit fixtures              |
-| `vendor/`               | (Empty) See `vendor/README.md` for licensing note |
+| `factories/`            | Python factories that emit synthetic fixtures    |
+| `vendor/`               | Public-domain & licensed vendor reference files  |
+| `vendor/irs-gov/`       | 8 official IRS form PDFs (public domain)         |
 | `generated/`            | Output of `generate_all.py` (gitignored)         |
-| `pyproject.toml`        | Poetry project for factory deps (reportlab, openpyxl, pypdf, Pillow) |
+| `pyproject.toml`        | Poetry project for factory deps (reportlab, openpyxl, pypdf, Pillow, cryptography) |
 
 ## Fixture manifest
 
