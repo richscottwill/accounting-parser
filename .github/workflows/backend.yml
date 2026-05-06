@@ -1,0 +1,66 @@
+name: backend
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend.yml"
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HYPOTHESIS_PROFILE: ci
+
+jobs:
+  lint:
+    name: Lint & type-check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install Poetry
+        run: pipx install poetry==2.4.0
+      - name: Install deps
+        run: poetry install --no-interaction --no-root
+      - name: Install package
+        run: poetry install --no-interaction
+      - name: ruff
+        run: poetry run ruff check .
+      - name: black
+        run: poetry run black --check .
+      - name: isort
+        run: poetry run isort --check-only .
+      - name: mypy
+        run: poetry run mypy src/
+
+  test:
+    name: Unit + Hypothesis tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install Poetry
+        run: pipx install poetry==2.4.0
+      - name: Install deps
+        run: poetry install --no-interaction
+      - name: pytest
+        run: poetry run pytest -v

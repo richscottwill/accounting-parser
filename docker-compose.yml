@@ -1,0 +1,64 @@
+# Local development infrastructure for accounting-parser.
+#
+# Brings up Postgres 16, Redis 7, and LocalStack (S3 + KMS + Cognito emulation).
+# Application services (backend API, Celery worker, frontend) run on the host
+# against these containers during development.
+#
+# Usage:
+#   docker compose up -d
+#   docker compose ps
+#   docker compose logs -f postgres
+#   docker compose down
+#   docker compose down -v   # remove volumes (destructive)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: accounting-parser-postgres
+    environment:
+      POSTGRES_USER: accounting_parser
+      POSTGRES_PASSWORD: dev_only_password
+      POSTGRES_DB: accounting_parser_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accounting_parser -d accounting_parser_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: accounting-parser-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  localstack:
+    image: localstack/localstack:3
+    container_name: accounting-parser-localstack
+    environment:
+      SERVICES: s3,kms,cognito-idp,sts,iam
+      DEBUG: 0
+      PERSISTENCE: 1
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  localstack_data:
