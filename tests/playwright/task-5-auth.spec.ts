@@ -27,6 +27,16 @@ test.describe("Task 5: auth + tenant isolation", () => {
     const ctxA = await browser.newContext();
     const pageA = await ctxA.newPage();
     const { cdp: cdpA } = await attachVirtualAuthenticatorToPage(pageA);
+    // Surface SPA console + failing API responses into the Playwright report.
+    pageA.on("console", (m) => console.log(`[A ${m.type()}] ${m.text()}`));
+    pageA.on("pageerror", (e) => console.log(`[A pageerror] ${e.message}`));
+    pageA.on("response", async (r) => {
+      const u = r.url();
+      if (u.includes("/auth/") && r.status() >= 400) {
+        const body = await r.text().catch(() => "");
+        console.log(`[A HTTP ${r.status()}] ${u} body=${body.slice(0, 600)}`);
+      }
+    });
     const suffixA = uniqueSuffix();
     await pageA.goto("/signup");
 
