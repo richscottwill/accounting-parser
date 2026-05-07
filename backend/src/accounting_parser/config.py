@@ -96,6 +96,9 @@ class Settings(BaseSettings):
     clamav_host: str = Field(default="localhost")
     clamav_port: int = Field(default=3310)
 
+    # --- OCR ------------------------------------------------------------
+    ocr_backend: str = Field(default="fake")  # "aws-textract" | "azure-di" | "fake"
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
