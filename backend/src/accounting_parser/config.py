@@ -87,6 +87,15 @@ class Settings(BaseSettings):
     app_name: str = Field(default="accounting-parser")
     debug: bool = Field(default=False)
 
+    # --- Ingestion ------------------------------------------------------
+    max_upload_bytes: int = Field(default=100 * 1024 * 1024)  # 100 MB
+    storage_backend: str = Field(default="local")  # "s3" | "local"
+    local_storage_root: str = Field(default="/tmp/accounting-parser-storage")
+    s3_bucket_prefix: str = Field(default="accounting-parser")
+    malware_scanner_backend: str = Field(default="eicar")  # "clamav" | "eicar" | "skip"
+    clamav_host: str = Field(default="localhost")
+    clamav_port: int = Field(default=3310)
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

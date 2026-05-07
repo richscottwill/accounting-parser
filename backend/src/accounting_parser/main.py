@@ -17,6 +17,7 @@ from accounting_parser import __version__
 from accounting_parser.auth.routes import router as auth_router
 from accounting_parser.auth.state import configure_auth_app_state
 from accounting_parser.config import get_settings
+from accounting_parser.ingestion.routes import router as ingestion_router
 
 
 @asynccontextmanager
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(auth_router)
+    app.include_router(ingestion_router)
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
