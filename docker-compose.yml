@@ -1,20 +1,28 @@
 # Local development infrastructure for accounting-parser (self-hosted fork).
 #
-# Brings up:
-#   - Postgres 16   — primary application database
-#   - Redis 7       — Celery broker + cache
-#   - LocalStack    — legacy parent-spec S3/KMS/Cognito emulation (retained
-#                     so parent-spec tests continue to pass; the self-hosted
-#                     fork's own adapters supersede these)
-#   - Authentik     — self-hosted IdP (Phase 1 P1.1). Requires its own
-#                     Postgres + Redis; sharing the app's stack would
-#                     couple Authentik's lifecycle to application data
-#                     which is an anti-pattern.
+# Phase 1 P1.6 polish: every service has a healthcheck, every secret
+# has a dev-only placeholder (installer generates real values), and
+# service dependencies use `condition: service_healthy` so a fresh
+# `docker compose up -d` waits for prerequisites before the app API
+# is reachable.
+#
+# Port map (host → container):
+#   443    Caddy TLS (Phase 2: currently commented; dev traffic goes
+#          direct to the app API)
+#   5432   Postgres (primary application DB)
+#   6379   Redis (Celery broker)
+#   4566   LocalStack (parent-spec compat only; removed in Phase 2)
+#   9400   Authentik HTTP
+#   9443   Authentik HTTPS
+#   9900   MinIO S3 API
+#   9901   MinIO console
+#   3310   ClamAV clamd
+#   8000   accounting-parser API
 #
 # Usage:
 #   docker compose up -d
 #   docker compose ps
-#   docker compose logs -f authentik-server
+#   curl http://localhost:8000/healthz
 #   docker compose down
 #   docker compose down -v   # remove volumes (destructive)
 
@@ -31,10 +39,15 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U accounting_parser -d accounting_parser_dev"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U accounting_parser -d accounting_parser_dev",
+        ]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
 
   redis:
     image: redis:7-alpine
@@ -45,7 +58,7 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   localstack:
     image: localstack/localstack:3
@@ -64,9 +77,10 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 20s
 
-  # ---- Authentik identity provider (self-hosted fork, Phase 1 P1.1) ----
+  # ---- Authentik identity provider (P1.1) ----
 
   authentik-postgres:
     image: postgres:16-alpine
@@ -82,6 +96,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
 
   authentik-redis:
     image: redis:7-alpine
@@ -99,8 +114,6 @@ services:
     container_name: accounting-parser-authentik-server
     command: server
     environment:
-      # Dev-only secret. Real installs generate this in the installer
-      # (P3.1) and store the sealed copy in the secrets vault (P1.3).
       AUTHENTIK_SECRET_KEY: dev-only-secret-key-rotate-in-prod
       AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
       AUTHENTIK_POSTGRESQL__USER: authentik
@@ -108,16 +121,11 @@ services:
       AUTHENTIK_POSTGRESQL__NAME: authentik
       AUTHENTIK_REDIS__HOST: authentik-redis
       AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
-      # Bootstrap an initial admin user + API token for the installer
-      # to consume. In production the installer rotates this after
-      # first login.
       AUTHENTIK_BOOTSTRAP_EMAIL: admin@accounting-parser.local
       AUTHENTIK_BOOTSTRAP_PASSWORD: dev_only_bootstrap
       AUTHENTIK_BOOTSTRAP_TOKEN: dev_only_bootstrap_token
     ports:
-      # Host only; Caddy will proxy in production. For dev we expose
-      # 9443 (HTTPS) directly.
-      - "9000:9000"
+      - "9400:9000"
       - "9443:9443"
     depends_on:
       authentik-postgres:
@@ -148,10 +156,8 @@ services:
         condition: service_healthy
       authentik-redis:
         condition: service_healthy
-    # Worker health is observable via the server's metrics; no direct
-    # healthcheck here because the worker exposes no HTTP port.
 
-  # ---- MinIO document storage (self-hosted fork, Phase 1 P1.2) ----
+  # ---- MinIO document storage (P1.2) ----
 
   minio:
     image: minio/minio:RELEASE.2024-10-13T13-34-11Z
@@ -162,11 +168,10 @@ services:
       MINIO_ROOT_PASSWORD: minio-dev-only
       MINIO_REGION: us-east-1
     ports:
-      # 9000 = S3 API (internal). 9001 = web console (dev-only).
-      # Host-exposed for developer convenience; in production Caddy
-      # never proxies MinIO externally — only the app API does.
-      - "9000:9000"
-      - "9001:9001"
+      # Host 9900/9901 to avoid collision with Authentik's 9000.
+      # Container ports stay at MinIO defaults (9000 S3 API, 9001 console).
+      - "9900:9000"
+      - "9901:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -174,8 +179,26 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 15s
 
-  # ---- ClamAV virus scanner (self-hosted fork, Phase 1 P1.2) ----
+  minio-bucket-init:
+    # One-shot sidecar that creates the app bucket on first boot so
+    # the app doesn't have to do it at startup. Idempotent: succeeds
+    # immediately if the bucket already exists.
+    image: minio/mc:RELEASE.2024-10-02T08-27-28Z
+    container_name: accounting-parser-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minio minio-dev-only &&
+      mc mb --ignore-existing local/accounting-parser &&
+      echo 'bucket ready'
+      "
+    restart: "no"
+
+  # ---- ClamAV virus scanner (P1.2) ----
 
   clamav:
     image: clamav/clamav:1.4
@@ -183,11 +206,8 @@ services:
     environment:
       CLAMAV_NO_FRESHCLAMD: "false"
       CLAMAV_NO_CLAMD: "false"
-      # First startup downloads definitions (~150 MB). Post-startup
-      # the freshclam sidecar refreshes them every 4 hours.
       CLAMD_STARTUP_TIMEOUT: "300"
     ports:
-      # 3310 internal only; exposed for dev inspection + test clients.
       - "3310:3310"
     volumes:
       - clamav_db:/var/lib/clamav
@@ -196,9 +216,68 @@ services:
       interval: 30s
       timeout: 10s
       retries: 20
-      # Definitions download is slow on first boot; forgive up to
-      # 5 minutes before healthcheck starts counting.
       start_period: 300s
+
+  # ---- accounting-parser API (P1.6 addition) ----
+  #
+  # Builds the backend image from backend/ and starts uvicorn on :8000.
+  # Depends on every service it needs to function — compose waits for
+  # health before starting this container, so the first request after
+  # `docker compose up -d` hits a fully-initialized system.
+  #
+  # Secrets here are DEV-ONLY. Real installs get generated values
+  # through the installer's sealed secrets bundle (P3.1).
+
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: accounting-parser-app
+    environment:
+      ACCOUNTING_PARSER_DB_URL: postgresql+psycopg://app_user:app_user@postgres:5432/accounting_parser_dev
+      ACCOUNTING_PARSER_AUTH_ADAPTER: authentik
+      ACCOUNTING_PARSER_AUTHENTIK_BASE_URL: http://authentik-server:9000
+      ACCOUNTING_PARSER_AUTHENTIK_CLIENT_ID: accounting-parser
+      ACCOUNTING_PARSER_AUTHENTIK_API_TOKEN: dev_only_bootstrap_token
+      ACCOUNTING_PARSER_AUTHENTIK_JWKS_URL: http://authentik-server:9000/application/o/accounting-parser/jwks/
+      ACCOUNTING_PARSER_AUTHENTIK_AUDIENCE: accounting-parser
+      ACCOUNTING_PARSER_AUTHENTIK_ISSUER: http://authentik-server:9000/application/o/accounting-parser/
+      ACCOUNTING_PARSER_DOC_STORE_ADAPTER: minio
+      ACCOUNTING_PARSER_MINIO_ENDPOINT_URL: http://minio:9000
+      ACCOUNTING_PARSER_MINIO_ACCESS_KEY: minio
+      ACCOUNTING_PARSER_MINIO_SECRET_KEY: minio-dev-only
+      ACCOUNTING_PARSER_STORAGE_BUCKET: accounting-parser
+      ACCOUNTING_PARSER_VIRUS_SCANNER: clamd
+      ACCOUNTING_PARSER_CLAMD_HOST: clamav
+      ACCOUNTING_PARSER_CLAMD_PORT: "3310"
+      ACCOUNTING_PARSER_FIRM_RP_ID: localhost
+      ACCOUNTING_PARSER_FIRM_RP_NAME: "Development Firm"
+      # Dev session key: an Ed25519-equivalent RSA-2048 pair would be
+      # generated by the installer in production. Unset in compose so
+      # the app refuses to start unless explicitly provided — prevents
+      # accidentally shipping compose with a default signing key.
+      # Set via .env or docker compose override for local dev.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-bucket-init:
+        condition: service_completed_successfully
+      authentik-server:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
 volumes:
   postgres_data:
