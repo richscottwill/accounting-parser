@@ -1,13 +1,20 @@
-# Local development infrastructure for accounting-parser.
+# Local development infrastructure for accounting-parser (self-hosted fork).
 #
-# Brings up Postgres 16, Redis 7, and LocalStack (S3 + KMS + Cognito emulation).
-# Application services (backend API, Celery worker, frontend) run on the host
-# against these containers during development.
+# Brings up:
+#   - Postgres 16   — primary application database
+#   - Redis 7       — Celery broker + cache
+#   - LocalStack    — legacy parent-spec S3/KMS/Cognito emulation (retained
+#                     so parent-spec tests continue to pass; the self-hosted
+#                     fork's own adapters supersede these)
+#   - Authentik     — self-hosted IdP (Phase 1 P1.1). Requires its own
+#                     Postgres + Redis; sharing the app's stack would
+#                     couple Authentik's lifecycle to application data
+#                     which is an anti-pattern.
 #
 # Usage:
 #   docker compose up -d
 #   docker compose ps
-#   docker compose logs -f postgres
+#   docker compose logs -f authentik-server
 #   docker compose down
 #   docker compose down -v   # remove volumes (destructive)
 
@@ -59,6 +66,93 @@ services:
       timeout: 5s
       retries: 5
 
+  # ---- Authentik identity provider (self-hosted fork, Phase 1 P1.1) ----
+
+  authentik-postgres:
+    image: postgres:16-alpine
+    container_name: accounting-parser-authentik-postgres
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: dev_only_authentik_password
+      POSTGRES_DB: authentik
+    volumes:
+      - authentik_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik -d authentik"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  authentik-redis:
+    image: redis:7-alpine
+    container_name: accounting-parser-authentik-redis
+    volumes:
+      - authentik_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.10
+    container_name: accounting-parser-authentik-server
+    command: server
+    environment:
+      # Dev-only secret. Real installs generate this in the installer
+      # (P3.1) and store the sealed copy in the secrets vault (P1.3).
+      AUTHENTIK_SECRET_KEY: dev-only-secret-key-rotate-in-prod
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: dev_only_authentik_password
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      # Bootstrap an initial admin user + API token for the installer
+      # to consume. In production the installer rotates this after
+      # first login.
+      AUTHENTIK_BOOTSTRAP_EMAIL: admin@accounting-parser.local
+      AUTHENTIK_BOOTSTRAP_PASSWORD: dev_only_bootstrap
+      AUTHENTIK_BOOTSTRAP_TOKEN: dev_only_bootstrap_token
+    ports:
+      # Host only; Caddy will proxy in production. For dev we expose
+      # 9443 (HTTPS) directly.
+      - "9000:9000"
+      - "9443:9443"
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:9000/-/health/live/"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.10
+    container_name: accounting-parser-authentik-worker
+    command: worker
+    environment:
+      AUTHENTIK_SECRET_KEY: dev-only-secret-key-rotate-in-prod
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: dev_only_authentik_password
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+    # Worker health is observable via the server's metrics; no direct
+    # healthcheck here because the worker exposes no HTTP port.
+
 volumes:
   postgres_data:
   localstack_data:
+  authentik_postgres_data:
+  authentik_redis_data:
