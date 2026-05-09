@@ -151,8 +151,59 @@ services:
     # Worker health is observable via the server's metrics; no direct
     # healthcheck here because the worker exposes no HTTP port.
 
+  # ---- MinIO document storage (self-hosted fork, Phase 1 P1.2) ----
+
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    container_name: accounting-parser-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio-dev-only
+      MINIO_REGION: us-east-1
+    ports:
+      # 9000 = S3 API (internal). 9001 = web console (dev-only).
+      # Host-exposed for developer convenience; in production Caddy
+      # never proxies MinIO externally — only the app API does.
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---- ClamAV virus scanner (self-hosted fork, Phase 1 P1.2) ----
+
+  clamav:
+    image: clamav/clamav:1.4
+    container_name: accounting-parser-clamav
+    environment:
+      CLAMAV_NO_FRESHCLAMD: "false"
+      CLAMAV_NO_CLAMD: "false"
+      # First startup downloads definitions (~150 MB). Post-startup
+      # the freshclam sidecar refreshes them every 4 hours.
+      CLAMD_STARTUP_TIMEOUT: "300"
+    ports:
+      # 3310 internal only; exposed for dev inspection + test clients.
+      - "3310:3310"
+    volumes:
+      - clamav_db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      # Definitions download is slow on first boot; forgive up to
+      # 5 minutes before healthcheck starts counting.
+      start_period: 300s
+
 volumes:
   postgres_data:
   localstack_data:
   authentik_postgres_data:
   authentik_redis_data:
+  minio_data:
+  clamav_db:
