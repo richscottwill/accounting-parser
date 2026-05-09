@@ -10,7 +10,7 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
     "fastapi (>=0.115,<1.0)",
     "uvicorn[standard] (>=0.32,<1.0)",
-    "pydantic (>=2.9,<3.0)",
+    "pydantic[email] (>=2.9,<3.0)",
     "pydantic-settings (>=2.6,<3.0)",
     "sqlalchemy (>=2.0,<3.0)",
     "alembic (>=1.13,<2.0)",
@@ -27,6 +27,7 @@ dependencies = [
     "ofxparse (>=0.21,<0.22)",
     "pypdf (>=6.10.2,<7.0.0)",
     "pdfplumber (>=0.11.9,<0.12.0)",
+    "email-validator (>=2.2,<3.0)",
 ]
 
 [tool.poetry]
@@ -66,6 +67,11 @@ ignore = ["S101"]  # assert allowed in tests
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S"]
+# FastAPI routes intentionally use Depends() in argument defaults —
+# this is the framework's canonical dependency-injection shape, not
+# the typical Python anti-pattern B008 warns against.
+"src/accounting_parser/api/routes/*" = ["B008"]
+"src/accounting_parser/api/deps.py" = ["B008"]
 
 [tool.mypy]
 python_version = "3.12"
