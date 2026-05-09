@@ -1,20 +1,16 @@
-"""FastAPI application entry point.
+"""uvicorn entry-point.
 
-This is a scaffolding stub. Task 5 introduces auth; Task 6 introduces ingestion.
+This module imports the app factory and exposes a module-level ``app``
+for uvicorn and friends. Production invocation:
+
+    uvicorn accounting_parser.main:app --host 0.0.0.0 --port 8000
+
+Tests use ``accounting_parser.api.create_app`` directly so they can
+inject alternate adapters and engines.
 """
 
-from fastapi import FastAPI
+from __future__ import annotations
 
-from accounting_parser import __version__
+from accounting_parser.api import create_app
 
-app = FastAPI(
-    title="accounting-parser",
-    version=__version__,
-    description="Accounting document parser for solo-practice CPAs",
-)
-
-
-@app.get("/healthz")
-async def healthz() -> dict[str, str]:
-    """Liveness probe."""
-    return {"status": "ok", "version": __version__}
+app = create_app()
