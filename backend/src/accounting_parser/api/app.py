@@ -20,6 +20,7 @@ from sqlalchemy.engine import Engine
 from accounting_parser import __version__
 from accounting_parser.api.deps import install_dependencies
 from accounting_parser.api.routes import auth_router, ingestion_router, portal_router
+from accounting_parser.api.routes.workflows import router as workflows_router
 from accounting_parser.auth.adapter import AuthAdapter
 from accounting_parser.auth.authentik import AuthentikAuthAdapter, AuthentikConfig
 from accounting_parser.auth.middleware import AuthMiddleware
@@ -28,6 +29,7 @@ from accounting_parser.ingestion.virus_scan import ClamdVirusScanner, NullVirusS
 from accounting_parser.storage.adapter import DocumentStoreAdapter
 from accounting_parser.storage.memory import InMemoryDocumentStoreAdapter
 from accounting_parser.storage.minio import MinIODocumentStoreAdapter
+from accounting_parser.workflow.registry import StepRegistry
 
 
 def create_app(
@@ -37,6 +39,7 @@ def create_app(
     engine: Engine | None = None,
     document_store: DocumentStoreAdapter | None = None,
     virus_scanner: VirusScanner | None = None,
+    workflow_registry: StepRegistry | None = None,
 ) -> FastAPI:
     """Build a configured FastAPI app."""
     resolved_settings = settings or get_settings()
@@ -44,6 +47,7 @@ def create_app(
     resolved_engine = engine or create_engine(resolved_settings.db_url, future=True)
     resolved_store = document_store or _default_document_store(resolved_settings)
     resolved_scanner = virus_scanner or _default_virus_scanner(resolved_settings)
+    resolved_registry = workflow_registry or _default_workflow_registry()
 
     app = FastAPI(
         title="accounting-parser",
@@ -57,6 +61,7 @@ def create_app(
     app.state.engine = resolved_engine
     app.state.document_store = resolved_store
     app.state.virus_scanner = resolved_scanner
+    app.state.workflow_registry = resolved_registry
 
     install_dependencies(app, engine=resolved_engine, adapter=resolved_adapter)
 
@@ -65,6 +70,7 @@ def create_app(
     app.include_router(auth_router, prefix="/auth", tags=["auth"])
     app.include_router(portal_router, prefix="/portal", tags=["portal"])
     app.include_router(ingestion_router, tags=["documents"])
+    app.include_router(workflows_router, tags=["workflows"])
 
     @app.get("/healthz", tags=["health"])
     async def healthz() -> dict[str, str]:
@@ -129,3 +135,15 @@ def _default_virus_scanner(settings: Settings) -> VirusScanner:
     if settings.virus_scanner == "clamd":
         return ClamdVirusScanner(host=settings.clamd_host, port=settings.clamd_port)
     raise RuntimeError(f"VIRUS_SCANNER={settings.virus_scanner!r} not recognized")
+
+
+def _default_workflow_registry() -> StepRegistry:
+    """Build a StepRegistry with built-in stub handlers.
+
+    P1.4 ships stubs for compute steps (parse / classify / validate /
+    post_adjustments / emit_export). Real handlers wire in once the
+    SPA (P1.5) can drive end-to-end validation.
+    """
+    registry = StepRegistry()
+    registry.register_builtin_stubs()
+    return registry
