@@ -20,12 +20,28 @@ from sqlalchemy.engine import Engine
 from accounting_parser import __version__
 from accounting_parser.api.deps import install_dependencies
 from accounting_parser.api.routes import auth_router, ingestion_router, portal_router
+from accounting_parser.api.routes.observability import router as observability_router
 from accounting_parser.api.routes.workflows import router as workflows_router
 from accounting_parser.auth.adapter import AuthAdapter
 from accounting_parser.auth.authentik import AuthentikAuthAdapter, AuthentikConfig
 from accounting_parser.auth.middleware import AuthMiddleware
 from accounting_parser.config import Settings, get_settings
 from accounting_parser.ingestion.virus_scan import ClamdVirusScanner, NullVirusScanner, VirusScanner
+from accounting_parser.observability.alerting import (
+    AlertingAdapter,
+    AlertmanagerAdapter,
+    NullAlertingAdapter,
+)
+from accounting_parser.observability.logging import (
+    LogSinkAdapter,
+    LokiLogAdapter,
+    NullLogSinkAdapter,
+)
+from accounting_parser.observability.metrics import (
+    MetricsAdapter,
+    NullMetricsAdapter,
+    PrometheusMetricsAdapter,
+)
 from accounting_parser.storage.adapter import DocumentStoreAdapter
 from accounting_parser.storage.memory import InMemoryDocumentStoreAdapter
 from accounting_parser.storage.minio import MinIODocumentStoreAdapter
@@ -40,6 +56,9 @@ def create_app(
     document_store: DocumentStoreAdapter | None = None,
     virus_scanner: VirusScanner | None = None,
     workflow_registry: StepRegistry | None = None,
+    metrics_adapter: MetricsAdapter | None = None,
+    log_sink: LogSinkAdapter | None = None,
+    alerting_adapter: AlertingAdapter | None = None,
 ) -> FastAPI:
     """Build a configured FastAPI app."""
     resolved_settings = settings or get_settings()
@@ -48,6 +67,9 @@ def create_app(
     resolved_store = document_store or _default_document_store(resolved_settings)
     resolved_scanner = virus_scanner or _default_virus_scanner(resolved_settings)
     resolved_registry = workflow_registry or _default_workflow_registry()
+    resolved_metrics = metrics_adapter or _default_metrics(resolved_settings)
+    resolved_log_sink = log_sink or _default_log_sink(resolved_settings)
+    resolved_alerting = alerting_adapter or _default_alerting(resolved_settings)
 
     app = FastAPI(
         title="accounting-parser",
@@ -62,6 +84,9 @@ def create_app(
     app.state.document_store = resolved_store
     app.state.virus_scanner = resolved_scanner
     app.state.workflow_registry = resolved_registry
+    app.state.metrics_adapter = resolved_metrics
+    app.state.log_sink = resolved_log_sink
+    app.state.alerting_adapter = resolved_alerting
 
     install_dependencies(app, engine=resolved_engine, adapter=resolved_adapter)
 
@@ -71,6 +96,7 @@ def create_app(
     app.include_router(portal_router, prefix="/portal", tags=["portal"])
     app.include_router(ingestion_router, tags=["documents"])
     app.include_router(workflows_router, tags=["workflows"])
+    app.include_router(observability_router, tags=["observability"])
 
     @app.get("/healthz", tags=["health"])
     async def healthz() -> dict[str, str]:
@@ -147,3 +173,21 @@ def _default_workflow_registry() -> StepRegistry:
     registry = StepRegistry()
     registry.register_builtin_stubs()
     return registry
+
+
+def _default_metrics(settings: Settings) -> MetricsAdapter:
+    if settings.metrics_adapter == "prometheus":
+        return PrometheusMetricsAdapter()
+    return NullMetricsAdapter()
+
+
+def _default_log_sink(settings: Settings) -> LogSinkAdapter:
+    if settings.log_sink == "loki":
+        return LokiLogAdapter()
+    return NullLogSinkAdapter()
+
+
+def _default_alerting(settings: Settings) -> AlertingAdapter:
+    if settings.alerting_adapter == "alertmanager":
+        return AlertmanagerAdapter(base_url=settings.alertmanager_url)
+    return NullAlertingAdapter()
