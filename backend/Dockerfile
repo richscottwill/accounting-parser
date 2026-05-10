@@ -24,15 +24,20 @@ RUN apt-get update \
 RUN pip install --no-cache-dir "poetry==${POETRY_VERSION}"
 
 WORKDIR /app
-COPY pyproject.toml poetry.lock* ./
-# Resolve deps only first; source copied later so edits don't bust this
-# layer. --without dev keeps the image lean (no pytest/ruff/etc.).
-RUN poetry install --no-root --without dev
 
+# Copy everything poetry needs to install deps + the project: lock,
+# toml, README (referenced in pyproject), and the src tree. Doing
+# this in one COPY trades a bit of cache efficiency for a smaller
+# Dockerfile surface. Dep resolution is fast enough that the rebuild
+# cost isn't meaningful during iteration.
+COPY pyproject.toml poetry.lock* README.md ./
 COPY src/ ./src/
 COPY migrations/ ./migrations/
 COPY alembic.ini* ./
-RUN poetry install --only-root
+
+# Install deps + the project root package. Poetry 2.x requires
+# README for package metadata (we COPY'd it above).
+RUN poetry install --without dev
 
 
 FROM python:3.12-slim AS runtime
