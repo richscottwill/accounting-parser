@@ -100,8 +100,82 @@ def all_templates() -> list[WorkflowTemplate]:
     return list(_TEMPLATES.values())
 
 
+# ---- Template: individual_1040_prep (parent Task 22) ------------
+#
+# Simpler than monthly_close: no WTB, no lead schedules, no AJEs.
+# Focus is on 1040 sub-parsers (W-2, 1099-*, K-1, 1098 mortgage) +
+# field-validation gate + shape-preserving export.
+
+individual_1040_prep = WorkflowTemplate(
+    id="individual_1040_prep",
+    title="Individual 1040 Preparation",
+    applies_to_engagement_types=frozenset({"tax_return"}),
+    steps=(
+        WorkflowStepDef(name="parse_1040_docs", step_type="parse"),
+        WorkflowStepDef(
+            name="ocr_field_gate",
+            step_type="require_preparer_review",
+            config={
+                "reason": "Confirm OCR-extracted fields from W-2 / 1099 / K-1 forms.",
+            },
+        ),
+        WorkflowStepDef(name="validate_1040_fields", step_type="validate"),
+        WorkflowStepDef(
+            name="emit_1040_export",
+            step_type="emit_export",
+            config={"target": "lacerte_1040"},
+        ),
+    ),
+)
+
+
+# ---- Template: year_end_tax_prep (parent Task 26, flagship) -----
+
+year_end_tax_prep = WorkflowTemplate(
+    id="year_end_tax_prep",
+    title="Year-End Tax Preparation",
+    applies_to_engagement_types=frozenset({"tax_return"}),
+    steps=(
+        WorkflowStepDef(name="rollforward", step_type="parse"),
+        WorkflowStepDef(name="parse_source_docs", step_type="parse"),
+        WorkflowStepDef(name="classify_accounts", step_type="classify"),
+        WorkflowStepDef(name="validate_tb", step_type="validate"),
+        WorkflowStepDef(name="run_depreciation", step_type="post_adjustments"),
+        WorkflowStepDef(name="run_book_to_tax", step_type="post_adjustments"),
+        WorkflowStepDef(
+            name="preparer_review",
+            step_type="require_preparer_review",
+            config={
+                "reason": (
+                    "Review proposed AJE/RJE/TJE entries and depreciation. "
+                    "Approve to post; reject individual entries in the UI."
+                ),
+            },
+        ),
+        WorkflowStepDef(name="post_adjustments", step_type="post_adjustments"),
+        WorkflowStepDef(
+            name="reviewer_signoff",
+            step_type="require_reviewer_signoff",
+            config={
+                "reason": (
+                    "Review lead schedules + financials before export to "
+                    "vendor system. HMAC signoff is append-only."
+                ),
+            },
+        ),
+        WorkflowStepDef(
+            name="emit_cch_export",
+            step_type="emit_export",
+            config={"target": "cch_engagement"},
+        ),
+    ),
+)
+
+
 def _register_defaults() -> None:
     register_template(monthly_close_bookkeeping)
+    register_template(individual_1040_prep)
+    register_template(year_end_tax_prep)
 
 
 # Register-on-import for the P1.4 shipped template. Future templates
