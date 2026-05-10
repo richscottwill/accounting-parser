@@ -1,0 +1,128 @@
+/* Minimal styles. Intentionally unopinionated — the SPA at P1.5
+ * prioritizes readable data layout over visual polish. Design pass
+ * lands when the firm principal actually starts using the app and
+ * we learn what needs surfacing. */
+
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+  background: canvas;
+  color: canvastext;
+}
+
+main {
+  max-width: 960px;
+  margin: 2rem auto;
+  padding: 0 1.25rem;
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 1.6rem;
+}
+
+h2 {
+  margin-top: 2rem;
+  font-size: 1.15rem;
+  border-bottom: 1px solid color-mix(in srgb, canvastext 20%, transparent);
+  padding-bottom: 0.35rem;
+}
+
+form label {
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+form input[type="text"],
+form input[type="email"] {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  margin-top: 0.25rem;
+  border: 1px solid color-mix(in srgb, canvastext 30%, transparent);
+  border-radius: 4px;
+  background: canvas;
+  color: canvastext;
+  font: inherit;
+}
+
+button {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid color-mix(in srgb, canvastext 30%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, canvas 85%, canvastext 15%);
+  color: canvastext;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.muted {
+  color: color-mix(in srgb, canvastext 55%, transparent);
+  font-size: 0.92rem;
+}
+
+.error {
+  color: #c0392b;
+  margin: 0.5rem 0;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid color-mix(in srgb, canvastext 15%, transparent);
+  padding-bottom: 0.5rem;
+}
+
+.user-menu {
+  font-size: 0.9rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0 1.5rem 0;
+  font-size: 0.93rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, canvastext 12%, transparent);
+}
+
+th {
+  font-weight: 600;
+  color: color-mix(in srgb, canvastext 80%, transparent);
+}
+
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0 1.5rem 0;
+}
+
+dt {
+  font-weight: 600;
+}
+
+.upload-label {
+  display: block;
+  margin: 0.5rem 0 1rem 0;
+}
