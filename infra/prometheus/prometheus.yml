@@ -1,0 +1,31 @@
+# Prometheus config for accounting-parser (P2.2).
+#
+# Single scrape target: the accounting-parser API's /metrics endpoint.
+# Alertmanager receives alerts via the alerting section; routing
+# rules live in alertmanager.yml.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    service: accounting-parser
+    firm_instance: dev
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+rule_files:
+  # Alert rules land here when Phase 3 wires the SRE drills.
+  # - /etc/prometheus/alerts/*.yml
+
+scrape_configs:
+  - job_name: accounting-parser-app
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - app:8000
+        labels:
+          instance: app

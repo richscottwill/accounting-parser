@@ -1,0 +1,36 @@
+# Alertmanager routing for accounting-parser (P2.2).
+#
+# SEV-1 → email + app banner (banner via app webhook receiver; to
+# be wired in P3.4).
+# SEV-2 → email only.
+# SEV-3 → dashboard only; dropped here and surfaced by Grafana.
+#
+# In dev all severities route to the default receiver (no-op) so
+# alerts can be inspected via the Alertmanager UI on :9093. Real
+# email config is installer-provisioned (the firm's own SMTP).
+
+route:
+  receiver: default
+  group_by: ["alertname", "severity"]
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 12h
+  routes:
+    - matchers:
+        - severity="sev_1"
+      receiver: default
+      continue: false
+    - matchers:
+        - severity="sev_2"
+      receiver: default
+      continue: false
+    - matchers:
+        - severity="sev_3"
+      receiver: default
+      continue: false
+
+receivers:
+  - name: default
+    # Dev-only: no email / webhook configured. Real installs fill
+    # this in with the firm's SMTP server and an in-app webhook
+    # receiver for the banner. See docs/install-guide.md.

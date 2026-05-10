@@ -146,6 +146,24 @@ class Settings(BaseSettings):
     clamd_host: str = Field(default="clamav")
     clamd_port: int = Field(default=3310, ge=1, le=65535)
 
+    # ---- Observability -----------------------------------------
+    metrics_adapter: Literal["prometheus", "null"] = Field(
+        default="prometheus",
+        description="Metrics backend. 'null' disables metrics (tests only).",
+    )
+    log_sink: Literal["loki", "null"] = Field(
+        default="loki",
+        description="Log sink. 'loki' emits JSON to stdout (promtail ships to Loki).",
+    )
+    alerting_adapter: Literal["alertmanager", "null"] = Field(
+        default="alertmanager",
+        description="Alerting backend. 'null' drops alerts (tests only).",
+    )
+    alertmanager_url: str = Field(
+        default="http://alertmanager:9093",
+        description="Alertmanager API URL for /api/v2/alerts POSTs.",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

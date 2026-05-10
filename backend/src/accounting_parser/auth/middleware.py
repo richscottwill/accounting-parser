@@ -41,6 +41,7 @@ from accounting_parser.auth.adapter import AuthAdapter, SessionVerificationError
 
 _ALLOW_LIST_PREFIXES: tuple[str, ...] = (
     "/healthz",
+    "/metrics",
     "/auth/signup",
     "/auth/login",
     "/auth/passkey/register/begin",  # initial registration challenge
