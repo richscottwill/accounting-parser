@@ -33,7 +33,7 @@ class ExportResult:
         return not self.blockers and len(self.artifacts) > 0
 
 
-class RefuseToEmit(Exception):
+class RefuseToEmit(Exception):  # noqa: N818
     """Raised when emit() is called with outstanding blockers."""
 
 

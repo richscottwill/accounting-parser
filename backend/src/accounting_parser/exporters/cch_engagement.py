@@ -19,19 +19,13 @@ from __future__ import annotations
 
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from decimal import Decimal
+from datetime import UTC, datetime
 from pathlib import Path
 
 from openpyxl import Workbook
 
-from accounting_parser.exporters.base import (
-    ExportBlocker,
-    ExportResult,
-    RefuseToEmit,
-)
+from accounting_parser.exporters.base import ExportBlocker, ExportResult, RefuseToEmit
 from accounting_parser.model.canonical import WorkingTrialBalance
-
 
 CCH_COLUMNS = (
     "Account Number",
@@ -59,30 +53,33 @@ class CCHEngagementExporter:
     def validate(self, wtb: WorkingTrialBalance) -> list[ExportBlocker]:
         blockers: list[ExportBlocker] = []
         unclassified = [
-            r for r in wtb.rows
+            r
+            for r in wtb.rows
             if r.account.category is None or r.account.category.lower() == "unclassified"
         ]
         if unclassified:
-            blockers.append(ExportBlocker(
-                rule_id="R17.cch.unclassified",
-                message=f"{len(unclassified)} account(s) are Unclassified: "
-                        f"{', '.join(r.account.account_number for r in unclassified[:5])}"
-                        + (", ..." if len(unclassified) > 5 else ""),
-            ))
+            blockers.append(
+                ExportBlocker(
+                    rule_id="R17.cch.unclassified",
+                    message=f"{len(unclassified)} account(s) are Unclassified: "
+                    f"{', '.join(r.account.account_number for r in unclassified[:5])}"
+                    + (", ..." if len(unclassified) > 5 else ""),
+                )
+            )
         missing_type = [r for r in wtb.rows if r.account.account_type is None]
         if missing_type:
-            blockers.append(ExportBlocker(
-                rule_id="R17.cch.missing_account_type",
-                message=f"{len(missing_type)} account(s) lack account_type",
-            ))
+            blockers.append(
+                ExportBlocker(
+                    rule_id="R17.cch.missing_account_type",
+                    message=f"{len(missing_type)} account(s) lack account_type",
+                )
+            )
         return blockers
 
     def emit(self, wtb: WorkingTrialBalance, output_dir: Path) -> ExportResult:
         blockers = self.validate(wtb)
         if blockers:
-            raise RefuseToEmit(
-                f"CCH export refused: {len(blockers)} blocker(s)"
-            )
+            raise RefuseToEmit(f"CCH export refused: {len(blockers)} blocker(s)")
         output_dir.mkdir(parents=True, exist_ok=True)
         tb_xlsx = self._write_tb_xlsx(wtb, output_dir / "tb_import.xlsx")
         dynalink = self._write_dynalink(output_dir / "TBLinkTrigger.dl")
@@ -109,8 +106,7 @@ class CCHEngagementExporter:
             acc = row.account
             ws.cell(row=r, column=1, value=acc.account_number)
             ws.cell(row=r, column=2, value=acc.account_name)
-            ws.cell(row=r, column=3,
-                    value=acc.account_type.value if acc.account_type else "")
+            ws.cell(row=r, column=3, value=acc.account_type.value if acc.account_type else "")
             ws.cell(row=r, column=4, value=float(row.prior_year))
             ws.cell(row=r, column=5, value=float(row.unadjusted))
             ws.cell(row=r, column=6, value=float(row.sum_aje))
@@ -126,10 +122,10 @@ class CCHEngagementExporter:
 
     def _write_dynalink(self, path: Path) -> Path:
         # Minimal Dynalink trigger file — the real format is XML per R17.4.
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(UTC).isoformat()
         path.write_text(
-            f"<?xml version=\"1.0\"?>\n"
-            f"<DynalinkTrigger timestamp=\"{ts}\" client=\"{self.client_name}\">\n"
+            f'<?xml version="1.0"?>\n'
+            f'<DynalinkTrigger timestamp="{ts}" client="{self.client_name}">\n'
             f"  <Action>UpdateTrialBalance</Action>\n"
             f"  <Year>{self.engagement_year}</Year>\n"
             f"</DynalinkTrigger>\n",

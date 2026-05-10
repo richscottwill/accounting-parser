@@ -60,24 +60,28 @@ def check_output_matches_fixture(
     expected_masked = _strip_variance(expected, variance_patterns)
     if actual_masked == expected_masked:
         return SmokeTestResult(
-            target_system=target_system, passed=True, drift_details=None,
+            target_system=target_system,
+            passed=True,
+            drift_details=None,
         )
     # Find first divergence position
     diff_at = 0
-    for i, (a, e) in enumerate(zip(actual_masked, expected_masked)):
+    for i, (a, e) in enumerate(zip(actual_masked, expected_masked, strict=False)):
         if a != e:
             diff_at = i
             break
     window = 80
-    a_slice = actual_masked[max(0, diff_at - window): diff_at + window]
-    e_slice = expected_masked[max(0, diff_at - window): diff_at + window]
+    a_slice = actual_masked[max(0, diff_at - window) : diff_at + window]
+    e_slice = expected_masked[max(0, diff_at - window) : diff_at + window]
     details = (
         f"first divergence at offset {diff_at}:\n"
         f"  expected (masked): {e_slice!r}\n"
         f"  actual   (masked): {a_slice!r}"
     )
     return SmokeTestResult(
-        target_system=target_system, passed=False, drift_details=details,
+        target_system=target_system,
+        passed=False,
+        drift_details=details,
     )
 
 
