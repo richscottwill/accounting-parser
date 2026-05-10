@@ -111,6 +111,41 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Document store adapter ----------------------------------
+    doc_store_adapter: Literal["minio", "s3", "memory"] = Field(
+        default="minio",
+        description=(
+            "Which DocumentStoreAdapter implementation to use. "
+            "'minio' is the self-hosted default, 's3' is a stub, "
+            "'memory' is in-process for tests."
+        ),
+    )
+    minio_endpoint_url: str = Field(default="http://minio:9000")
+    minio_access_key: str = Field(default="minio")
+    minio_secret_key: SecretStr = Field(default=SecretStr("minio-dev-only"))
+    minio_region: str = Field(default="us-east-1")
+    storage_bucket: str = Field(
+        default="accounting-parser",
+        description="Bucket name for document objects. Single bucket per firm install.",
+    )
+
+    # ---- Ingestion ---------------------------------------------
+    ingest_max_bytes: int = Field(
+        default=100 * 1024 * 1024,
+        ge=1024,
+        le=1024 * 1024 * 1024,
+        description="Maximum upload size in bytes. Default 100 MB (parent R22.1).",
+    )
+    virus_scanner: Literal["clamd", "null"] = Field(
+        default="clamd",
+        description=(
+            "Which virus scanner to use. 'clamd' talks to the ClamAV "
+            "sidecar; 'null' skips scanning (opted-out deployments + tests)."
+        ),
+    )
+    clamd_host: str = Field(default="clamav")
+    clamd_port: int = Field(default=3310, ge=1, le=65535)
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
