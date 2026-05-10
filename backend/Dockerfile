@@ -32,7 +32,7 @@ RUN poetry install --no-root --without dev
 COPY src/ ./src/
 COPY migrations/ ./migrations/
 COPY alembic.ini* ./
-RUN poetry install --only-root --without dev
+RUN poetry install --only-root
 
 
 FROM python:3.12-slim AS runtime
